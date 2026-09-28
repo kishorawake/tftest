@@ -173,6 +173,8 @@ jobs:
           -var-file=${{ github.event.inputs.environment }}.tfvars \
           -var="location=${{ github.event.inputs.region }}" \
           -var="resource_group=${{ github.event.inputs.resource_group }}" \
+          -var="module=${{ github.event.inputs.module }}" \
+          ${{ github.event.inputs.refresh == 'false' && '-refresh=false' || '' }} \
           -out=tfplan
 
 ############################################################
@@ -189,6 +191,10 @@ jobs:
 
           terraform apply \
           -var-file=${{ github.event.inputs.environment }}.tfvars \
+          -var="location=${{ github.event.inputs.region }}" \
+          -var="resource_group=${{ github.event.inputs.resource_group }}" \
+          -var="module=${{ github.event.inputs.module }}" \
+          ${{ github.event.inputs.refresh == 'false' && '-refresh=false' || '' }} \
           ${{ github.event.inputs.auto_approve == 'true' && '-auto-approve' || '' }}
 
 ############################################################
@@ -205,6 +211,10 @@ jobs:
 
           terraform destroy \
           -var-file=${{ github.event.inputs.environment }}.tfvars \
+          -var="location=${{ github.event.inputs.region }}" \
+          -var="resource_group=${{ github.event.inputs.resource_group }}" \
+          -var="module=${{ github.event.inputs.module }}" \
+          ${{ github.event.inputs.refresh == 'false' && '-refresh=false' || '' }} \
           ${{ github.event.inputs.auto_approve == 'true' && '-auto-approve' || '' }}
 
 ############################################################
