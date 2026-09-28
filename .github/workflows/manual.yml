@@ -1,0 +1,244 @@
+name: Manual Terraform Deployment
+
+on:
+  workflow_dispatch:
+
+    inputs:
+
+      environment:
+        description: "Select Environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - uat
+          - prod
+
+      region:
+        description: "Azure Region"
+        required: true
+        type: choice
+        options:
+          - Central India
+          - East US
+          - West Europe
+
+      operation:
+        description: "Terraform Operation"
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+      module:
+        description: "Terraform Module"
+        required: true
+        type: choice
+        options:
+          - networking
+          - aks
+          - keyvault
+          - sql
+
+      terraform_version:
+        description: "Terraform Version"
+        required: true
+        default: "1.13.4"
+        type: string
+
+      refresh:
+        description: "Refresh State"
+        type: boolean
+        default: true
+
+      auto_approve:
+        description: "Auto Approve"
+        type: boolean
+        default: false
+
+      resource_group:
+        description: "Resource Group Name"
+        type: string
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_ROOT: terraform
+
+concurrency:
+  group: terraform-${{ github.event.inputs.environment }}
+  cancel-in-progress: true
+
+jobs:
+
+  prepare:
+
+    runs-on: ubuntu-latest
+
+    outputs:
+      tf_version: ${{ steps.output.outputs.tf_version }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - id: output
+
+        run: |
+          echo "tf_version=${{ github.event.inputs.terraform_version }}" >> $GITHUB_OUTPUT
+
+      - name: Display Inputs
+
+        run: |
+
+          echo "Environment : ${{ github.event.inputs.environment }}"
+          echo "Region      : ${{ github.event.inputs.region }}"
+          echo "Operation   : ${{ github.event.inputs.operation }}"
+          echo "Module      : ${{ github.event.inputs.module }}"
+          echo "RG          : ${{ github.event.inputs.resource_group }}"
+          echo "Refresh     : ${{ github.event.inputs.refresh }}"
+          echo "AutoApprove : ${{ github.event.inputs.auto_approve }}"
+
+############################################################
+
+  terraform:
+
+    needs: prepare
+
+    runs-on: ubuntu-latest
+
+    environment:
+      name: ${{ github.event.inputs.environment }}
+
+    strategy:
+
+      matrix:
+
+        subscription:
+
+          - LandingZone
+
+          - SharedServices
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+
+        uses: hashicorp/setup-terraform@v3
+
+        with:
+          terraform_version: ${{ needs.prepare.outputs.tf_version }}
+
+      - name: Azure Login
+
+        uses: azure/login@v2
+
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION }}
+
+      - name: Terraform Init
+
+        working-directory: ${{ env.TF_ROOT }}
+
+        run: terraform init
+
+      - name: Terraform Validate
+
+        working-directory: ${{ env.TF_ROOT }}
+
+        run: terraform validate
+
+############################################################
+# PLAN
+############################################################
+
+      - name: Terraform Plan
+
+        if: github.event.inputs.operation == 'plan'
+
+        working-directory: ${{ env.TF_ROOT }}
+
+        run: |
+
+          terraform plan \
+          -var-file=${{ github.event.inputs.environment }}.tfvars \
+          -var="location=${{ github.event.inputs.region }}" \
+          -var="resource_group=${{ github.event.inputs.resource_group }}" \
+          -out=tfplan
+
+############################################################
+# APPLY
+############################################################
+
+      - name: Terraform Apply
+
+        if: github.event.inputs.operation == 'apply'
+
+        working-directory: ${{ env.TF_ROOT }}
+
+        run: |
+
+          terraform apply \
+          -var-file=${{ github.event.inputs.environment }}.tfvars \
+          ${{ github.event.inputs.auto_approve == 'true' && '-auto-approve' || '' }}
+
+############################################################
+# DESTROY
+############################################################
+
+      - name: Terraform Destroy
+
+        if: github.event.inputs.operation == 'destroy'
+
+        working-directory: ${{ env.TF_ROOT }}
+
+        run: |
+
+          terraform destroy \
+          -var-file=${{ github.event.inputs.environment }}.tfvars \
+          ${{ github.event.inputs.auto_approve == 'true' && '-auto-approve' || '' }}
+
+############################################################
+
+      - name: Upload Plan
+
+        if: github.event.inputs.operation == 'plan'
+
+        uses: actions/upload-artifact@v4
+
+        with:
+          name: tfplan-${{ github.event.inputs.environment }}
+          path: terraform/tfplan
+
+############################################################
+
+  summary:
+
+    needs: terraform
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Summary
+
+        run: |
+
+          echo "Deployment Finished"
+
+          echo "Environment : ${{ github.event.inputs.environment }}"
+
+          echo "Region      : ${{ github.event.inputs.region }}"
+
+          echo "Operation   : ${{ github.event.inputs.operation }}"
+
+          echo "Module      : ${{ github.event.inputs.module }}"
