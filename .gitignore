@@ -1,0 +1,17 @@
+# Terraform-managed files
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*
+
+# Secrets and local files
+*.tfvars
+.env*
+*.pem
+*.key
+.vscode/
+.idea/
+artifacts/

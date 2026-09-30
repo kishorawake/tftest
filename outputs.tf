@@ -1,0 +1,9 @@
+output "resource_group_id" { value = module.resource_group.id }
+output "resource_group_name" { value = module.resource_group.name }
+output "network_vnet_id" { value = module.network.vnet_id }
+output "log_analytics_workspace_id" { value = module.log_analytics.workspace_id }
+output "storage_account_id" { value = module.storage.account_id }
+output "key_vault_id" { value = module.key_vault.id }
+output "sql_server_id" { value = module.sql.id }
+output "aks_cluster_id" { value = module.aks.id }
+output "aks_cluster_name" { value = module.aks.name }
